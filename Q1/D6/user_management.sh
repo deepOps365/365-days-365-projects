@@ -91,12 +91,12 @@ list_users() {
     echo "  ALL USER ACCOUNTS"
     print_line
 
-    echo "Username | UID | Home"
+    printf "%-20s %-6s %s\n" "Username" "UID" "Home"
     print_line
 
     while IFS=: read -r username _ uid _ _ home _; do
         if [ "$uid" -ge 1000 ] && [ "$uid" -ne 65534 ]; then
-            echo "$username | $uid |   $home"
+            printf "%-20s %-6s %s\n" "$username" "$uid" "$home"
         fi
     done < /etc/passwd
 
@@ -152,6 +152,150 @@ show_user_info() {
     press_enter
 }
 
+# ---------- Group management functions ----------
+
+# 6a. Create a group
+create_group() {
+    print_line
+    echo "  CREATE A NEW GROUP"
+    print_line
+
+    read -p "Enter the group name: " groupname
+
+    if getent group "$groupname" &>/dev/null; then
+        echo "Group '$groupname' already exists!"
+        press_enter
+        return
+    fi
+
+    groupadd "$groupname"
+    echo "Group '$groupname' created."
+    press_enter
+}
+
+# 6b. Delete a group
+delete_group() {
+    print_line
+    echo "  DELETE A GROUP"
+    print_line
+
+    read -p "Enter the group name to delete: " groupname
+
+    if ! getent group "$groupname" &>/dev/null; then
+        echo "Group '$groupname' does not exist!"
+        press_enter
+        return
+    fi
+
+    read -p "Are you sure you want to delete '$groupname'? (yes/no): " confirm
+    if [ "$confirm" != "yes" ]; then
+        echo "Cancelled. No changes were made."
+        press_enter
+        return
+    fi
+
+    groupdel "$groupname"
+    echo "Group '$groupname' has been deleted."
+    press_enter
+}
+
+# 6c. Add a user to a group
+add_user_to_group() {
+    print_line
+    echo "  ADD USER TO GROUP"
+    print_line
+
+    read -p "Enter the username: " username
+    read -p "Enter the group name: " groupname
+
+    if ! id "$username" &>/dev/null; then
+        echo "User '$username' does not exist!"
+        press_enter
+        return
+    fi
+
+    if ! getent group "$groupname" &>/dev/null; then
+        echo "Group '$groupname' does not exist!"
+        press_enter
+        return
+    fi
+
+    usermod -aG "$groupname" "$username"
+    echo "User '$username' added to group '$groupname'."
+    press_enter
+}
+
+# 6d. Remove a user from a group
+remove_user_from_group() {
+    print_line
+    echo "  REMOVE USER FROM GROUP"
+    print_line
+
+    read -p "Enter the username: " username
+    read -p "Enter the group name: " groupname
+
+    if ! id "$username" &>/dev/null; then
+        echo "User '$username' does not exist!"
+        press_enter
+        return
+    fi
+
+    if ! getent group "$groupname" &>/dev/null; then
+        echo "Group '$groupname' does not exist!"
+        press_enter
+        return
+    fi
+
+    gpasswd -d "$username" "$groupname"
+    press_enter
+}
+
+# 6e. List all groups
+list_groups() {
+    print_line
+    echo "  ALL GROUPS"
+    print_line
+
+    printf "%-20s %-6s %s\n" "Group" "GID" "Members"
+    print_line
+
+    while IFS=: read -r groupname _ gid members; do
+        if [ "$gid" -ge 1000 ] && [ "$gid" -ne 65534 ]; then
+            printf "%-20s %-6s %s\n" "$groupname" "$gid" "$members"
+        fi
+    done < /etc/group
+
+    press_enter
+}
+
+# 6. Group management submenu
+group_menu() {
+    while true; do
+        clear
+        print_line
+        echo "   GROUP MANAGEMENT"
+        print_line
+        echo " 1. Create a group"
+        echo " 2. Delete a group"
+        echo " 3. Add user to group"
+        echo " 4. Remove user from group"
+        echo " 5. List all groups"
+        echo " 6. Back to main menu"
+        print_line
+        read -p " Enter your choice (1-6): " gchoice
+
+        case "$gchoice" in
+            1) create_group ;;
+            2) delete_group ;;
+            3) add_user_to_group ;;
+            4) remove_user_from_group ;;
+            5) list_groups ;;
+            6) return ;;
+            *) echo "Invalid choice."; sleep 2 ;;
+        esac
+    done
+}
+
 # ---------- Main menu ----------
 
 show_menu() {
@@ -164,9 +308,10 @@ show_menu() {
     echo " 3. List all users"
     echo " 4. Change a user's password"
     echo " 5. Show user info"
-    echo " 6. Exit"
+    echo " 6. Group management"
+    echo " 7. Exit"
     print_line
-    read -p " Enter your choice (1-6): " choice
+    read -p " Enter your choice (1-7): " choice
 }
 
 # ---------- Main program ----------
@@ -182,7 +327,8 @@ while true; do
         3) list_users ;;
         4) change_password ;;
         5) show_user_info ;;
-        6) echo "Goodbye!"; exit 0 ;;
-        *) echo "Invalid choice. Please enter a number from 1 to 8."; sleep 2 ;;
+        6) group_menu ;;
+        7) echo "Goodbye!"; exit 0 ;;
+        *) echo "Invalid choice. Please enter a number from 1 to 7."; sleep 2 ;;
     esac
 done
